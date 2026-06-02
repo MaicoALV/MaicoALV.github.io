@@ -95,6 +95,34 @@
         .btn-excluir:hover {
             background-color: #c0392b;
         }
+
+        .btn-status {
+            width: auto;
+            padding: 6px 12px;
+            font-size: 14px;
+            float: right;
+            margin-top: -5px;
+            margin-right: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-concluir {
+            background-color: rgba(46, 204, 113, 0.8);
+        }
+
+        .btn-concluir:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-desfazer {
+            background-color: rgba(241, 196, 15, 0.8);
+            color: #111;
+        }
+
+        .btn-desfazer:hover {
+            background-color: #f39c12;
+        }
         
         .btn-limpar-tudo {
             background-color: rgba(231, 76, 60, 0.8);
@@ -134,6 +162,12 @@
             border-top: 1px solid rgba(255, 255, 255, 0.05);
             border-right: 1px solid rgba(255, 255, 255, 0.05);
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card-entrega.concluido {
+            border-left-color: #2ecc71;
+            opacity: 0.5;
         }
         
         .card-entrega p {
@@ -146,6 +180,10 @@
             color: #e74c3c;
             font-size: 18px;
             text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .card-entrega.concluido .destaque {
+            color: #2ecc71;
         }
         
         .texto-vazio {
@@ -190,7 +228,17 @@
     </div>
 
     <script>
+        // Melhora: Carregamento blindado contra erros de cache antigo
         let entregas = {};
+        try {
+            let dadosSalvos = localStorage.getItem('roteiro_entregas');
+            if (dadosSalvos) {
+                entregas = JSON.parse(dadosSalvos);
+            }
+        } catch (erro) {
+            console.error("Erro ao carregar dados antigos, resetando banco local:", erro);
+            entregas = {};
+        }
 
         document.getElementById('formEntrega').addEventListener('submit', function(evento) {
             evento.preventDefault();
@@ -213,7 +261,8 @@
                 entregas[chaveEndereco] = {
                     nomes: [nome],
                     enderecoOriginal: endereco,
-                    quantidade: quantidade
+                    quantidade: quantidade,
+                    concluido: false 
                 };
             }
 
@@ -230,6 +279,15 @@
             }
         }
 
+        function alternarStatus(chave) {
+            // Garante que a propriedade exista antes de alternar
+            if (entregas[chave].concluido === undefined) {
+                entregas[chave].concluido = false;
+            }
+            entregas[chave].concluido = !entregas[chave].concluido;
+            atualizarTela();
+        }
+
         document.getElementById('btnLimparTudo').addEventListener('click', function() {
             if (confirm("Atenção! Isso vai apagar TODAS as entregas cadastradas. Deseja continuar?")) {
                 entregas = {};
@@ -238,6 +296,8 @@
         });
 
         function atualizarTela() {
+            localStorage.setItem('roteiro_entregas', JSON.stringify(entregas));
+
             let areaLista = document.getElementById('areaLista');
             let btnLimparTudo = document.getElementById('btnLimparTudo');
             areaLista.innerHTML = '';
@@ -254,13 +314,23 @@
 
             locais.forEach(function(chave) {
                 let dados = entregas[chave];
-                let nomesFormatados = dados.nomes.join(', ');
-
-                let divCard = document.createElement('div');
-                divCard.className = 'card-entrega';
                 
+                // Correção dinâmica para dados da versão anterior do site
+                if (dados.concluido === undefined) {
+                    dados.concluido = false;
+                }
+
+                let nomesFormatados = dados.nomes.join(', ');
+                let divCard = document.createElement('div');
+                divCard.className = 'card-entrega' + (dados.concluido ? ' concluido' : '');
+                
+                let botaoStatus = dados.concluido 
+                    ? `<button class="btn-status btn-desfazer" onclick="alternarStatus('${chave}')">↩ Desfazer</button>`
+                    : `<button class="btn-status btn-concluir" onclick="alternarStatus('${chave}')">✔ Entregue</button>`;
+
                 divCard.innerHTML = `
                     <button class="btn-excluir" onclick="apagarEntrega('${chave}')">Excluir</button>
+                    ${botaoStatus}
                     <p><strong>Endereço:</strong> ${dados.enderecoOriginal}</p>
                     <p><strong>Destinatário(s):</strong> ${nomesFormatados}</p>
                     <p><strong>Total de Peças:</strong> <span class="destaque">${dados.quantidade}</span></p>
@@ -269,6 +339,8 @@
                 areaLista.appendChild(divCard);
             });
         }
+
+        atualizarTela();
     </script>
 
 </body>
